@@ -46,7 +46,9 @@ May be used in any os system.
 
 * **sections_file**
 
-                CSV, pickle or DataFrame describing hysteretic model parameters.
+                CSV, pickle or DataFrame describing hysteretic model parameters. See
+                [Creating a section information file](docs/sections_file.md) for
+                the required columns and generation workflows.
 
 * **loads_file**
 
