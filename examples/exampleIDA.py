@@ -18,7 +18,6 @@ input_dir = main_dir / "Inputs"
 materials_file = input_dir / "materials.csv"
 outputsDir = main_dir / "outputs/ida"
 loads_file = input_dir / "action.csv"
-modal_analysis_path = main_dir / "outputs/modal/MA.json"
 
 section_file = input_dir / "hinge_models.pickle"
 with open(section_file, "rb") as f:
@@ -38,10 +37,13 @@ flag3d = True
 export_at_each_step = False
 analysis_time_step = 0.01
 max_runs = 10
+periods_ida = [0.96, 1.03]
+damping = 0.05
 
 m = RCMRF(section_file, loads_file, materials_file, outputsDir, gmdir=gmdir, gmfileNames=gmfileNames,
           analysis_type=analysis_type, system=system, hinge_model=hingeModel, flag3d=flag3d,
-          export_at_each_step=export_at_each_step, modal_analysis_path=modal_analysis_path, max_runs=max_runs)
+          export_at_each_step=export_at_each_step, periods_ida=periods_ida, damping=damping,
+          max_runs=max_runs, analysis_time_step=analysis_time_step)
 
 m.wipe()
 m.run_model()

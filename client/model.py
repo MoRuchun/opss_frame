@@ -3,12 +3,8 @@ Model creator of an RC MRF. Lumped hinge models following the recommendations of
 """
 import openseespy.opensees as op
 import pandas as pd
-
-from analysis.modal import Modal
-from analysis.spo import SPO
-from analysis.static import Static
+import numpy as np
 from client.geometry import Geometry
-from client.recorders import Recorders
 from client.sections import Sections
 from utils.utils import *
 
@@ -18,12 +14,7 @@ class Model:
                  hingeModel='hysteretic', flag3d=False, direction=0):
         """
         Initializes OpenSees model creator
-        :param analysis_type: list(str)             Type of analysis for which we are recording [TH, PO, ST, MA, ELF]
-                                                    TH - time history analysis
-                                                    PO - static pushover analysis
-                                                    ST - static analysis (e.g. gravity)
-                                                    MA - modal analysis
-                                                    ELF - equivalent lateral force method of analysis
+        :param analysis_type: list(str)             Analysis workflow tags. Only "IDA" and "MSA" are supported.
         :param sections_file: str                   Name of the input csv file containing information on the elements
             Features:   Element - element type (column/beam)
                         Bay - bay location of element counting from the left side
@@ -73,8 +64,6 @@ class Model:
         self.UBIG = 1.e10
         self.outputsDir = outputsDir
 
-        # Nodes necessary for SPO analysis
-        self.spo_nodes = []
         if self.flag3d:
             f = {}
             cols = None
@@ -111,8 +100,6 @@ class Model:
         self.loads = pd.read_csv(loads_file)
         check_integrity(self.system, self.flag3d, self.hingeModel)
         self.g = Geometry(self.sections, self.hingeModel, flag3d=self.flag3d)
-        self.NUM_MODES = 3
-        self.DAMP_MODES = [1, 2]
         self.results = {}
 
     def _create_model(self):
@@ -536,33 +523,6 @@ class Model:
             else:
                 print('[SUCCESS] Seismic masses have been defined')
 
-    def set_recorders(self, analysis, **kwargs):
-        """
-        Defining recorders
-        :param analysis: str
-        :param kwargs:
-        :return: dict                               Dictionary containing all results
-        """
-        r = Recorders(self.g, self.elements, self.hingeModel, self.flag3d)
-        base_nodes = kwargs.get('base_nodes', None)
-        num_modes = kwargs.get('num_modes', None)
-
-        if analysis == 'ST' or analysis == 'static' or analysis == 'gravity':
-            results = r.st_recorder(base_nodes)
-
-        elif analysis == 'MA' or analysis == 'modal':
-            lam = kwargs.get('lam', None)
-            results = r.ma_recorder(num_modes, lam, None)
-
-        elif analysis == 'ELF' or analysis == 'ELFM':
-            results = r.st_recorder(base_nodes)
-
-        else:
-            results = None
-
-        print('[SUCCESS] Recorders have been generated')
-        return results
-
     def define_loads(self, elements, apply_loads=True, apply_point=False):
         """
         Defines gravity loads provided by the user
@@ -723,129 +683,6 @@ class Model:
                 print('[SUCCESS] Gravity loads as point loads have been defined')
             else:
                 print('[SUCCESS] Gravity loads as distributed loads have been defined')
-
-    def perform_analysis(self, elfm_filename=None, **kwargs):
-        """
-        Performs analysis
-        :param elfm_filename: str                           File name of ELF containing load values (for ELF)
-        :param kwargs: mode_shape: list                     Mode shape values from MA (for PO)
-        :param kwargs: damping: float                       Damping (for MA)
-        :param kwargs: spo_pattern: int                     SPO lateral load pattern ID
-        :return: dict                                       Results containing recorded data
-        """
-        mode_shape = kwargs.get('mode_shape', None)
-        damping = kwargs.get('damping', None)
-        spo_pattern = kwargs.get('spo_pattern', 2)
-
-        if 'ELF' in self.analysis_type or 'ELFM' in self.analysis_type:
-            print('[STEP] ELF started')
-            try:
-                elfm_forces = pd.read_csv(elfm_filename)
-                elfm_forces = elfm_forces[(elfm_forces['Pattern'] == 'elf')]
-            except:
-                raise ValueError('[EXCEPTION] ELF forces not provided')
-
-            op.timeSeries('Linear', 3)
-            op.pattern('Plain', 300, 3)
-            for st in range(self.g.nst):
-                load = elfm_forces[(elfm_forces['Storey'] == st + 1)]['Load'].iloc[0]
-                if self.hingeModel == 'haselton':
-                    op.load(int(f"{st + 1}{self.g.nbays + 1}"), load, self.NEGLIGIBLE, self.NEGLIGIBLE)
-                else:
-                    if self.flag3d:
-                        # TODO, to be corrected for 3D
-                        op.load(int(f"{self.g.nbays + 1}{st + 1}"), load, self.NEGLIGIBLE, self.NEGLIGIBLE,
-                                self.NEGLIGIBLE, self.NEGLIGIBLE, self.NEGLIGIBLE)
-                    else:
-                        op.load(int(f"{self.g.nbays + 1}{st + 1}"), load, self.NEGLIGIBLE, self.NEGLIGIBLE)
-
-            s = Static()
-            s.static_analysis(None, self.flag3d)
-            self.results['ELF'] = self.set_recorders('ELF', base_nodes=self.base_nodes)
-            print('[SUCCESS] ELF done')
-
-        if 'ST' in self.analysis_type or 'static' in self.analysis_type or 'gravity' in self.analysis_type:
-            print('[STEP] Gravity static analysis started')
-            s = Static()
-            s.static_analysis(None, self.flag3d)
-            self.results['Gravity'] = self.set_recorders('ST', base_nodes=self.base_nodes)
-
-            filepath = self.outputsDir / 'ST'
-
-            export_to(filepath, self.results['Gravity'], "json")
-
-            print('[SUCCESS] Static gravity analysis done')
-
-        if 'MA' in self.analysis_type or 'modal' in self.analysis_type:
-            print('[STEP] Modal analysis started')
-            m = Modal(self.NUM_MODES, self.DAMP_MODES, damping)
-            self.results['Modal'], positions = self.set_recorders('MA', num_modes=self.NUM_MODES, lam=m.lam)
-
-            # Modify positions of modal parameters
-            if positions is not None:
-                omega = [m.omega[i] for i in positions]
-                xi_modes = [m.xi_modes[i] for i in positions]
-                period = [m.period[i] for i in positions]
-            else:
-                omega = m.omega
-                xi_modes = m.xi_modes
-                period = m.period
-
-            self.results['Modal']['Periods'] = period
-            self.results['Modal']['Damping'] = xi_modes
-            self.results['Modal']['CircFreq'] = omega
-
-            filepath = self.outputsDir / 'MA'
-            export_to(filepath, self.results['Modal'], "json")
-
-            print('[SUCCESS] Modal analysis done')
-            mode_shape = self.results['Modal']['Mode1']
-
-        if 'PO' in self.analysis_type or 'pushover' in self.analysis_type:
-            control_nodes = []
-            for i in range(self.g.nst):
-                if not self.flag3d:
-                    if self.hingeModel == 'haselton':
-                        control_nodes.append(int(f"{i + 2}{self.g.nbays + 1}20"))
-                    else:
-                        control_nodes.append(int(f"{self.g.nbays + 1}{i + 1}"))
-                else:
-                    control_nodes.append(int(f"{self.g.nbays[0] + 1}{self.g.nbays[1] + 1}{i + 1}"))
-
-            print('[STEP] Static pushover analysis started')
-            # Top node tag for recording the top displacement and for the integrator
-            if not self.flag3d:
-                if self.hingeModel == 'haselton':
-                    id_ctrl_node = int(f"{self.g.nst + 1}{self.g.nbays + 1}20")
-                else:
-                    id_ctrl_node = int(f"{self.g.nbays + 1}{self.g.nst}")
-                # Number of bays
-                nbays_x = self.g.nbays
-                nbays_y = None
-            else:
-                id_ctrl_node = int(f"{self.g.nbays[0] + 1}{self.g.nbays[1] + 1}{self.g.nst}")
-                nbays_x = self.g.nbays[0]
-                nbays_y = self.g.nbays[1]
-
-            # DOF associated with the direction of interest
-            id_ctrl_dof = self.direction + 1
-
-            # Reference displacement to which cycles are run
-            dref = 0.1 * max(self.g.heights)
-
-            # Call the SPO object
-            spo = SPO(id_ctrl_node, id_ctrl_dof, self.base_cols, dref=dref, flag3d=self.flag3d,
-                      direction=self.direction, filename=None, site=None)
-
-            spo.load_pattern(control_nodes, load_pattern=spo_pattern, heights=self.g.heights, mode_shape=mode_shape,
-                             nbays_x=nbays_x, nbays_y=nbays_y)
-            spo.set_analysis(heights=self.g.heights)
-            outputs = np.array(spo.seek_solution())
-            filepath = self.outputsDir / 'SPO'
-            export_to(filepath, outputs.tolist(), "json")
-            export_to(self.outputsDir / "sectionForces", spo.sectionForces, "pickle")
-
-            print('[SUCCESS] Static pushover analysis done')
 
     def _lumped_hinge_element(self):
         """

@@ -21,7 +21,6 @@ May be used in any os system.
 1. [Supported analysis types](#analysis)
 2. [Required input arguments](#input)
 3. [Samples](#samples)
-4. [Future](#future)
 
 </details>
 
@@ -32,13 +31,9 @@ May be used in any os system.
 <summary>Show/Hide</summary>
 <br>
 
-1. Static elastic analysis (ST)
-2. Modal analysis (MA)
-3. Equivalent lateral force (ELF)
-4. Static pushover analysis (PO)
-5. Non-linear time history analysis (NLTHA)
+1. Non-linear time history analysis (NLTHA)
    1. Incremental dynamic analysis (IDA)
-	2. Multiple stripe analysis (MSA)
+   2. Multiple stripe analysis (MSA)
 	
 </details>
 
@@ -49,87 +44,78 @@ May be used in any os system.
 <summary>Show/Hide</summary>
 <br>
 
-* **sections_file** - required for All
-  	
-		csv or pickle file or DataFrame with hysteretic model parameters
+* **sections_file**
 
-* **loads_file** - required for All
+                CSV, pickle or DataFrame describing hysteretic model parameters.
 
-		csv file masses and gravity loads
+* **loads_file**
 
-* **materials_file** - required for All
+                CSV file defining masses and gravity loads.
 
-		csv file containing material properties
+* **materials_file**
 
-* **outputsDir** - required for All
+                CSV file containing material properties.
 
-		Directory to export outputs to
+* **outputsDir**
 
-* **gmdir** - required for IDA and MSA
-		
-		Directory to read records from
+                Directory to export analysis outputs.
 
-* **gmfileNames** - required for IDA and MSA
+* **gmdir**
 
-		File names in order of ["GM_names_x", "GM_names_y", "GM_time_step"]
+                Directory containing ground motion records.
 
-* **IM_type** - required for IDA, default to 2
+* **gmfileNames**
 
-		Intensity measure type
+                Filenames describing ["GM_names_x", "GM_names_y", "GM_time_step"].
 
-* **max_runs** - required for IDA, default to 15
+* **analysis_type**
 
-		Maxium number of runs per record
+                List or string identifying the workflows to run. Supported values: "IDA", "MSA".
 
-* **analysis_time_step** - required for IDA and MSA, default to 0.01
+* **periods_ida**
 
-		Nonlinear analysis time step
+                List of periods used to scale and interpret ground motions. Required for IDA and for
+                MSA when modal frequencies are not provided separately.
 
-* **drift_capacity** - required for IDA, default to 10 (%)
+* **damping**
 
-		Assumed drift capacity for the building, beyond which the building is assumed to have collapsed
+                Modal damping ratio (e.g. 0.05) used in nonlinear time history analyses.
 
-* **analysis_type** - required for All
+* **IM_type**
 
-		Analysis type to be run, list of strings, e.g. ["ST", "MA"] to run both ST and MA
+                Intensity measure type for IDA (default 2 for Sa(T1)).
 
-* **system** - required for All, default to "space"
+* **max_runs**
 
-		May have two values:
-			perimeter - exterior frames only as seismic lateral-load resisting frames
-			space - all frames as seismic lateral-load resisting frames
+                Maximum number of runs per record for IDA (default 15).
 
-* **hinge_model** - required for All, default to "Hysteretic"
-		
-		May have two values:
-			Hysteretic - Hysteretic hinge models (uses offsets)
-			Haselton - Haselton spring models (uses four node panel zones)
+* **analysis_time_step**
 
-* **flag3d** - required for All, default to False
+                Nonlinear analysis time step (default 0.01 s).
 
-		False for 2D modelling
-		True for 3D modelling
+* **drift_capacity**
 
-* **direction** - required for PO and ELF
+                Drift capacity threshold (%) to stop IDA (default 10).
 
-		Direction of application for PO and ELF analysis
-		0 stands for X direction, 1 stands for Y direction
+* **system**
 
-* **export_at_each_step** - required for MSA and IDA, default to True
+                Structural system description ("perimeter" or "space", default "space").
 
-		True for exporting outputs for each time step (recommended)
+* **hinge_model**
 
-* **period_assignment** - required for IDA, dictionary
+                Lumped hinge model type ("hysteretic" or "haselton", default "hysteretic").
 
-		Period assignment ID for X and Y direction
+* **flag3d**
 
-* **periods_ida** - required for IDA
+                False for 2D modelling, True for 3D modelling.
 
-		List of float (periods) to use for IDA analysis
+* **direction**
 
-* **tcl_filename** - required for ST, MA, PO
+                Seismic loading direction for 3D analyses (0 for X, 1 for Y). Ignored for 2D models.
 
-		tcl filename necessary to generate tcl file models
+* **export_at_each_step**
+
+                Export recorder outputs after each run (default True).
 
 	
 </details>
@@ -141,27 +127,11 @@ May be used in any os system.
 <summary>Show/Hide</summary>
 <br>
 
-**3D building models**
+**Non-linear time history workflows**
 
-Example 1: Static analysis - exampleStatic.py
+Example 1: IDA - exampleIDA.py
 
-
-Example 2: Modal analysis - exampleModel.py
-
-
-Example 3: Static pushover analaysis - examplePushover.py
-
-
-Example 4: MSA - exampleMSA.py
-
-
-Example 5: IDA - exampleIDA.py
-
-
-Example 6: Visualize - visualizeSPO.py
-
-
-Example 7: 2D model with Haselton springs - exampleHaselton2D.py
+Example 2: MSA - exampleMSA.py
 
 
 </details>
