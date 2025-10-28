@@ -1,0 +1,14 @@
+
+database/*
+.idea/*
+__pycache__/*
+analysis/__pycache__/'
+client/__pycache__/'
+/venv/
+/examples/PBEE/inputs/sample/RCMRF/
+/temp.py
+/examples/PBEE/inputs/sample/groundMotionMSA/
+/examples/PBEE/inputs/sample/RCMRF/Medium/
+/examples/PBEE/inputs/sample/
+/examples/PBEE/
+todo.txt
